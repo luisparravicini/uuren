@@ -9,7 +9,7 @@ class TimeStore
 
     @db.execute(<<-SQL)
       CREATE TABLE IF NOT EXISTS
-      uuren
+      slots
       (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         start_time INTEGER NOT NULL,
@@ -21,7 +21,7 @@ class TimeStore
   end
 
   def start_tracking
-    @db.execute('INSERT INTO uuren (start_time, end_time) VALUES (:start, :end)',
+    @db.execute('INSERT INTO slots (start_time, end_time) VALUES (:start, :end)',
                 { start: now, end: now })
     @slot_id = @db.last_insert_row_id
   end
@@ -29,8 +29,12 @@ class TimeStore
   def update_tracking
     return if @slot_id.nil?
 
-    @db.execute('UPDATE uuren SET end_time = :end WHERE id = :id',
+    @db.execute('UPDATE slots SET end_time = :end WHERE id = :id',
                  { end: now, id: @slot_id })
+  end
+
+  def today_time
+    @db.get_first_value('SELECT SUM(end_time - start_time) FROM slots')
   end
 
   def now
@@ -43,9 +47,11 @@ end
 store = TimeStore.new
 
 begin
+  puts('Tracking time...')
   store.start_tracking
-  print('Tracking time...')
   while true do
+    elapsed = store.today_time
+    print("\rToday: #{Time.at(elapsed).utc.strftime('%H:%M:%S')}")
     sleep(60)
     store.update_tracking
   end
