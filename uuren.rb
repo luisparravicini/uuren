@@ -17,22 +17,20 @@ class TimeStore
       )
     SQL
 
-    @id = nil
+    @slot_id = nil
   end
 
   def start_tracking
-    opened_slots = @db.get_first_value('SELECT COUNT(1) FROM uuren WHERE end_time IS NULL')[0]
-
-    raise "Not expecting opened slots!" if opened_slots > 0
-    @db.execute('INSERT INTO uuren (start_time) VALUES (?)', now)
-    @id = @db.last_insert_row_id
+    @db.execute('INSERT INTO uuren (start_time, end_time) VALUES (:start, :end)',
+                { start: now, end: now })
+    @slot_id = @db.last_insert_row_id
   end
 
-  def stop_tracking
-    return if @id.nil?
+  def update_tracking
+    return if @slot_id.nil?
 
     @db.execute('UPDATE uuren SET end_time = :end WHERE id = :id',
-                 { end: now, id: @id })
+                 { end: now, id: @slot_id })
   end
 
   def now
@@ -46,9 +44,12 @@ store = TimeStore.new
 
 begin
   store.start_tracking
-  print('Starting...')
-  $stdin.gets
+  print('Tracking time...')
+  while true do
+    sleep(60)
+    store.update_tracking
+  end
 rescue SystemExit, Interrupt
-  store.stop_tracking
+  store.update_tracking
 end
 
