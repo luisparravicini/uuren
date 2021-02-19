@@ -9,36 +9,32 @@ class TimeStore
 
     @db.execute(<<-SQL)
       CREATE TABLE IF NOT EXISTS
-      slots
+      hours
       (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        start_time INTEGER NOT NULL,
-        end_time INTEGER
+        date TEXT NOT NULL UNIQUE,
+        seconds INTEGER NOT NULL
       )
     SQL
-
-    @slot_id = nil
   end
 
-  def start_tracking
-    @db.execute('INSERT INTO slots (start_time, end_time) VALUES (:start, :end)',
-                { start: now, end: now })
-    @slot_id = @db.last_insert_row_id
-  end
-
-  def update_tracking
-    return if @slot_id.nil?
-
-    @db.execute('UPDATE slots SET end_time = :end WHERE id = :id',
-                 { end: now, id: @slot_id })
+  def add_to_today(seconds)
+    t = today
+    @db.execute('INSERT OR IGNORE INTO hours (date, seconds) VALUES (?, 0)', t)
+    @db.execute('UPDATE hours SET seconds = seconds + ? WHERE date = ?',
+                 [seconds, t])
   end
 
   def today_time
-    @db.get_first_value('SELECT SUM(end_time - start_time) FROM slots')
+    @db.get_first_value('SELECT seconds FROM hours WHERE date = ?', today) || 0
+  end
+
+  def today
+    now.strftime('%Y-%m-%d')
   end
 
   def now
-    Time.now.to_i
+    Time.now
   end
 end
 
@@ -46,16 +42,22 @@ end
 
 store = TimeStore.new
 
+last_update = store.now
 begin
   puts('Tracking time...')
-  store.start_tracking
+  sleep_time = 60
   while true do
     elapsed = store.today_time
-    print("\rToday: #{Time.at(elapsed).utc.strftime('%H:%M:%S')}")
-    sleep(60)
-    store.update_tracking
+    elapsed_str = Time.at(elapsed).utc.strftime('%H:%M:%S')
+    print("\rToday: #{elapsed_str}")
+    sleep(sleep_time)
+    store.add_to_today(sleep_time)
+
+    last_update = Time.now
   end
 rescue SystemExit, Interrupt
-  store.update_tracking
+  unless last_update.nil?
+    store.add_to_today((store.now - last_update).to_i)
+  end
 end
 
