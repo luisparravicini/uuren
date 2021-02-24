@@ -25,6 +25,11 @@ class TimeStore
                  [seconds, t])
   end
 
+  def this_month_time
+    date = today.gsub(/-\d{2}$/, '-01')
+    @db.get_first_value('SELECT SUM(seconds) FROM hours WHERE date >= ?', date) || 0
+  end
+
   def yesterday_time
     day_elapsed(today(-1))
   end
@@ -58,9 +63,10 @@ last_update = store.now
 begin
   puts('Tracking time...')
   sleep_time = 60
-  puts(format_elapsed('Yesterday', store.yesterday_time))
+  puts(format_elapsed('This month', store.this_month_time))
+  puts(format_elapsed('Yesterday ', store.yesterday_time))
   while true do
-    print("\r%s" % format_elapsed('Today    ', store.today_time))
+    print("\r%s" % format_elapsed('Today     ', store.today_time))
 
     sleep(sleep_time)
     store.add_to_today(sleep_time)
