@@ -28,7 +28,8 @@ class TimeStore
   def this_month_time
     date = now.strftime('%Y-%m-01')
     hours = @db.get_first_value('SELECT SUM(seconds) FROM hours WHERE date >= ?', date) || 0
-    days = @db.get_first_value('SELECT COUNT(DISTINCT(date)) FROM hours WHERE date >= ?', date) || 0
+    days = @db.get_first_value('SELECT COUNT(DISTINCT(date)) FROM hours WHERE date >= ?', date)
+    days = 1 if days.zero?
     [hours, days]
   end
 
