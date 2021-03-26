@@ -68,7 +68,7 @@ begin
   sleep_time = 60
   time_month, day_of_month = store.this_month_time
   print("This month: #{time_month / 3600} hours")
-  puts(' (%s)' % format_elapsed('daily', time_month / day_of_month))
+  puts(' (%s)' % format_elapsed('daily avg', time_month / day_of_month))
   puts(format_elapsed('Yesterday ', store.yesterday_time))
   while true do
     print("\r%s" % format_elapsed('Today     ', store.today_time))
