@@ -27,10 +27,10 @@ class TimeStore
 
   def this_month_time
     date = now.strftime('%Y-%m-01')
-    hours = @db.get_first_value('SELECT SUM(seconds) FROM hours WHERE date >= ?', date) || 0
+    elapsed = @db.get_first_value('SELECT SUM(seconds) FROM hours WHERE date >= ?', date) || 0
     days = @db.get_first_value('SELECT COUNT(DISTINCT(date)) FROM hours WHERE date >= ?', date)
     days = 1 if days.zero?
-    [hours, days]
+    [elapsed, days]
   end
 
   def yesterday_time
@@ -66,9 +66,9 @@ last_update = store.now
 begin
   puts('Tracking time...')
   sleep_time = 60
-  hours_month, day_of_month = store.this_month_time
-  print(format_elapsed('This month', hours_month))
-  puts(' (%s)' % format_elapsed('daily', hours_month / day_of_month))
+  time_month, day_of_month = store.this_month_time
+  print("This month: #{time_month / 3600} hours")
+  puts(' (%s)' % format_elapsed('daily', time_month / day_of_month))
   puts(format_elapsed('Yesterday ', store.yesterday_time))
   while true do
     print("\r%s" % format_elapsed('Today     ', store.today_time))
