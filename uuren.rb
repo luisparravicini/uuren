@@ -1,6 +1,8 @@
 #!/usr/bin/env -S ruby -W
 
 require 'sqlite3'
+require 'active_support'
+require 'active_support/core_ext'
 
 
 class TimeStore
@@ -25,12 +27,23 @@ class TimeStore
                  [seconds, t])
   end
 
-  def this_month_time
-    date = now.strftime('%Y-%m-01')
-    elapsed = @db.get_first_value('SELECT SUM(seconds) FROM hours WHERE date >= ?', date) || 0
-    days = @db.get_first_value('SELECT COUNT(DISTINCT(date)) FROM hours WHERE date >= ?', date)
-    days = 1 if days.zero?
-    [elapsed, days]
+  def per_month_time
+    all_months = @db.execute('SELECT DISTINCT(SUBSTR(date, 1, 7)) FROM hours')
+
+    all_months.map do |d|
+      year, month = d.first.split('-').map(&:to_i)
+      start_at = Date.new(year, month, 1)
+      stop_at = start_at.next_month
+
+      start_at = start_at.iso8601
+      stop_at = stop_at.iso8601
+
+      elapsed = @db.get_first_value('SELECT SUM(seconds) FROM hours WHERE date >= ? AND date < ?', start_at, stop_at) || 0
+      days = @db.get_first_value('SELECT COUNT(DISTINCT(date)) FROM hours WHERE date >= ? AND date < ?', start_at, stop_at)
+      days = 1 if days.zero?
+
+      [start_at, elapsed, days]
+    end
   end
 
   def yesterday_time
@@ -65,10 +78,18 @@ store = TimeStore.new
 last_update = store.now
 begin
   puts('Tracking time...')
+  puts('Per month:')
+  monthly_hours = store.per_month_time
+  monthly_hours.each_with_index do |datum, i|
+    month, time_month, day_of_month = datum
+    title = i == monthly_hours.size - 1 ? "\nThis month" : month
+    print("#{title}: #{time_month / 3600} hours")
+    puts(' (%s)' % format_elapsed('daily avg', time_month / day_of_month))
+  end
+  puts
+
   sleep_time = 60
-  time_month, day_of_month = store.this_month_time
-  print("This month: #{time_month / 3600} hours")
-  puts(' (%s)' % format_elapsed('daily avg', time_month / day_of_month))
+
   puts(format_elapsed('Yesterday ', store.yesterday_time))
   while true do
     print("\r%s" % format_elapsed('Today     ', store.today_time))
